@@ -70,9 +70,9 @@ const LocationProbe = () => {
   return <output data-testid="location">{location.pathname}</output>
 }
 
-const renderEditor = () =>
+const renderEditor = (path = '/forum/new') =>
   render(
-    <MemoryRouter initialEntries={['/forum/new']}>
+    <MemoryRouter initialEntries={[path]}>
       <>
         <ContentEditorRoutes />
         <LocationProbe />
@@ -95,6 +95,67 @@ describe('论坛帖子编辑器草稿保存', () => {
     fireEvent.change(screen.getAllByRole('combobox')[0], { target: { value: 'section-1' } })
     fireEvent.change(screen.getByLabelText('正文'), { target: { value: '测试正文' } })
   }
+
+  it('从歌曲入口创建乐评时不预填正文，并保留板块和歌曲关联', async () => {
+    mockedApiGet.mockResolvedValue({
+      sections: [
+        { id: 'section-1', name: '综合讨论' },
+        { id: 'music', name: '音乐' },
+      ],
+    } as never)
+    mockedApiPost.mockResolvedValueOnce({
+      post: { id: 'post-1', slug: '101', status: 'draft' },
+    } as never)
+
+    // 旧链接仍包含 musicTitle，也不应该将说明文字注入正文。
+    renderEditor('/forum/new?musicDocId=song-1&musicTitle=%E6%B5%8B%E8%AF%95%E6%AD%8C%E6%9B%B2')
+    await screen.findByRole('option', { name: '音乐' })
+
+    expect(screen.getAllByRole('combobox')[0]).toHaveValue('music')
+    expect(screen.getByLabelText('正文')).toHaveValue('')
+
+    fireEvent.change(screen.getByPlaceholderText('forum.titlePlaceholder'), {
+      target: { value: '我的乐评' },
+    })
+    fireEvent.click(await findDraftSaveButton())
+
+    await waitFor(() => {
+      expect(toastShow).toHaveBeenCalledWith('内容不能为空', { variant: 'error' })
+      expect(mockedApiPost).not.toHaveBeenCalled()
+    })
+
+    fireEvent.change(screen.getByLabelText('正文'), {
+      target: { value: '我对这首歌的理解' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '保存草稿' }))
+
+    await waitFor(() =>
+      expect(mockedApiPost).toHaveBeenCalledWith(
+        '/api/posts',
+        expect.objectContaining({
+          title: '我的乐评',
+          section: 'music',
+          content: '我对这首歌的理解',
+          musicDocId: 'song-1',
+          status: 'draft',
+        })
+      )
+    )
+  })
+
+  it('仅携带歌曲 ID 时也自动选择音乐板块且正文为空', async () => {
+    mockedApiGet.mockResolvedValue({
+      sections: [
+        { id: 'section-1', name: '综合讨论' },
+        { id: 'music', name: '音乐' },
+      ],
+    } as never)
+
+    renderEditor('/forum/new?musicDocId=song-1')
+    await screen.findByRole('option', { name: '音乐' })
+    expect(screen.getAllByRole('combobox')[0]).toHaveValue('music')
+    expect(screen.getByLabelText('正文')).toHaveValue('')
+  })
 
   it('显示 API 返回的保存原因而不是固定失败文案', async () => {
     mockedApiPost.mockRejectedValueOnce(new Error('版块不存在'))

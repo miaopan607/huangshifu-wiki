@@ -118,6 +118,14 @@ const renderDetail = (song = createSong()) => {
 }
 
 describe('MusicDetail 来源展示', () => {
+  it('发表乐评链接只传递关联歌曲 ID', async () => {
+    renderDetail()
+    expect(await screen.findByRole('link', { name: '发表乐评' })).toHaveAttribute(
+      'href',
+      '/forum/new?musicDocId=song-1'
+    )
+  })
+
   it('歌曲来源指向官方平台链接', async () => {
     renderDetail()
     expect(await screen.findByRole('heading', { name: '歌曲信息' })).toBeInTheDocument()

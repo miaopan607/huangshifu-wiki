@@ -1341,7 +1341,6 @@ export const PostEditor = () => {
   const { user, isAdmin, isBanned, loading: authLoading } = useAuth()
   const [searchParams] = useSearchParams()
   const musicDocIdParam = searchParams.get('musicDocId')
-  const musicTitleParam = searchParams.get('musicTitle')
   const [sections, setSections] = useState<SectionItem[]>([])
   const [formData, setFormData] = useState({
     title: '',
@@ -1364,7 +1363,7 @@ export const PostEditor = () => {
   const { show } = useToast()
   const tagSuggestions = useTagSuggestions('post')
 
-  // 基线在默认版块/内容或编辑帖回填落定后建立，避免加载期误判为已修改
+  // 基线在默认版块或编辑帖回填落定后建立，避免加载期误判为已修改
   const [baseline, setBaseline] = useState<typeof formData | null>(null)
   const isDirty = useMemo(
     () => baseline !== null && hasFormChanges(formData, baseline),
@@ -1379,28 +1378,18 @@ export const PostEditor = () => {
         const fetchedSections = data.sections || []
         setSections(fetchedSections)
 
-        let defaultSection = fetchedSections[0]?.id || ''
-        let defaultContent = ''
-
-        if (musicDocIdParam && musicTitleParam) {
-          defaultSection = 'music'
-          defaultContent = `\n\n---\n${t('forum.musicReviewTemplate', { title: decodeURIComponent(musicTitleParam) })}\n`
-        }
+        const defaultSection = musicDocIdParam ? 'music' : fetchedSections[0]?.id || ''
 
         setFormData((prev) => ({
-          title: prev.title,
+          ...prev,
           section: prev.section || defaultSection,
-          content: prev.content || defaultContent,
-          tags: prev.tags,
-          locationName: prev.locationName,
-          locationCode: prev.locationCode,
         }))
         setBaseline(
           (prev) =>
             prev ?? {
               title: '',
               section: defaultSection,
-              content: defaultContent,
+              content: '',
               tags: '',
               locationName: null,
               locationCode: null,
@@ -1412,7 +1401,7 @@ export const PostEditor = () => {
     }
 
     fetchSections()
-  }, [musicDocIdParam, musicTitleParam])
+  }, [musicDocIdParam])
 
   const loadEditingPost = useCallback(async () => {
     if (!postId || authLoading) return
